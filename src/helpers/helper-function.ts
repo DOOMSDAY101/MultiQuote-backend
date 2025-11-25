@@ -2,6 +2,11 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt'
 import { config } from '../config/env';
 import jwt, { JwtPayload } from 'jsonwebtoken';
+import axios from 'axios';
+import LoginHistory from '../models/login-history.model';
+import { Request } from "express";
+const UAParser = require('ua-parser-js');
+
 
 export function generateRandomPassword(length = 12): string {
     const charset =
@@ -71,4 +76,49 @@ export const signRefreshToken = (payload: any): string => {
         throw new Error('JWT secret or expiration time not provided');
     }
     return jwt.sign(payload, secret, { expiresIn });
+};
+
+export const getIPDetails = async (ip: string) => {
+    if (!ip) {
+        return {};
+    }
+
+    interface IPDetails {
+        region: string;
+        city: string;
+        country: string;
+    }
+
+    const response = await axios.get(`https://ipinfo.io/${ip}?token=${config.IP_TOKEN}`);
+    const data = response.data as IPDetails;
+
+    const { region, city, country } = data;
+
+    return { region, city, country };
+};
+
+export const createLoginSession = async (req: Request, userId: string) => {
+    const ip = req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || '';
+    const { city, region, country } = await getIPDetails(ip);
+
+    const userAgent = req.headers['user-agent'] || null;
+    const parser = new UAParser(userAgent);
+    const uaResult = parser.getResult();
+
+    const browser = uaResult.browser.name || null;
+    const os = uaResult.os.name || null;
+    const deviceType = uaResult.device.type || 'desktop';
+
+    return await LoginHistory.create({
+        userId,
+        ipAddress: ip,
+        city,
+        region,
+        country,
+        browser,
+        os,
+        deviceType,
+        userAgent,
+        loginTime: new Date(),
+    });
 };

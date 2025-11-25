@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import User, { BasicStatus, UserRole } from '../models/user.model';
-import { formatPhoneNumber, generateRandomPassword } from '../helpers/helper-function';
+import { createLoginSession, formatPhoneNumber, generateRandomPassword, getIPDetails } from '../helpers/helper-function';
 import { sendUserPasswordEmail, sendVerificationCodeEmail } from '../middlewares/email.middleware';
 import bcrypt from 'bcrypt';
 import { Op } from 'sequelize';
@@ -132,8 +132,13 @@ export const verifyLoginCode = async (req: Request, res: Response) => {
 
         await tokenRecord.destroy();
 
+
+        const loginSession = await createLoginSession(req, user.id);
+
+        req.loginHistoryId = loginSession.id; // Assign login history ID to the extended Request object
+
         const accessToken = jwt.sign(
-            { id: user.id, role: user.role },
+            { id: user.id, role: user.role, login_history_id: loginSession.id, },
             config.JWT_SECRET!,
             { expiresIn: "1h" }
         );

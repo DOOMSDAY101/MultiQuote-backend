@@ -1,5 +1,6 @@
 //this file is used to associate models together.
 import AuditLog from "../models/audit-log.model";
+import LoginHistory from "../models/login-history.model";
 import User from "../models/user.model";
 import { VerificationToken } from "../models/verification-token.model";
 
@@ -7,7 +8,8 @@ import { VerificationToken } from "../models/verification-token.model";
 const models = {
     User,
     VerificationToken,
-    AuditLog
+    AuditLog,
+    LoginHistory
 };
 
 // Sync associations by passing models as argument

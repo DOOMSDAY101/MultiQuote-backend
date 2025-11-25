@@ -8,3 +8,23 @@ declare global {
         }
     }
 }
+
+
+
+import 'express';
+
+
+
+declare global {
+
+    namespace Express {
+
+        interface Request {
+
+            loginHistoryId?: string;
+
+        }
+
+    }
+
+}

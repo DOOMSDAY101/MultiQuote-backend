@@ -176,7 +176,8 @@ router.post(
  *                   type: string
  *                   example: Internal server error
  */
-router.post("/login", handleValidation(loginValidator), loginUser);
+router.post("/login", handleValidation(loginValidator), auditLogger(AuditActions.LOGIN_ATTEMPTS),
+    loginUser);
 
 /**
  * @swagger
@@ -260,6 +261,7 @@ router.post("/login", handleValidation(loginValidator), loginUser);
 router.post(
     "/verify-login-code",
     handleValidation(verifyLoginCodeValidator),
+    auditLogger(AuditActions.VERIFY_EMAIL_TOKEN),
     verifyLoginCode
 );
 

@@ -36,5 +36,8 @@ export const config = {
     SUPER_ADMIN_EMAIL: process.env.SUPER_ADMIN_EMAIL,
     SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
-    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+
+    // IP INFO
+    IP_TOKEN: process.env.IP_TOKEN,
 };

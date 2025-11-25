@@ -1,5 +1,6 @@
 import { Model, DataTypes, Optional } from 'sequelize';
 import { sequelize } from '../config/database';
+import LoginHistory from './login-history.model';
 
 interface AuditLogAttributes {
     id: string;
@@ -14,6 +15,7 @@ interface AuditLogAttributes {
     user_id?: string;
     user_role: string;
     success: boolean;
+    login_history_id?: string;
 }
 
 interface AuditLogCreationAttributes
@@ -33,21 +35,36 @@ class AuditLog extends Model<AuditLogAttributes, AuditLogCreationAttributes>
     declare user_id?: string;
     declare user_role: string;
     declare success: boolean;
+    declare login_history_id?: string;
 
     readonly createdAt!: Date;
     readonly updatedAt!: Date;
 
 
+
     computeResponseLength() {
         try {
             const parsed =
-                typeof this.response_payload === 'string' ? JSON.parse(this.response_payload) : this.response_payload;
-            if (parsed && typeof parsed === 'object' && Array.isArray(parsed.data)) {
+                typeof this.response_payload === "string"
+                    ? JSON.parse(this.response_payload)
+                    : this.response_payload;
+
+            if (parsed && typeof parsed === "object" && Array.isArray(parsed.data)) {
                 this.response_length = parsed.data.length;
+            } else {
+                this.response_length = 1; // fallback for single object
             }
         } catch {
             this.response_length = 0;
         }
+    }
+
+
+    static associate(models: any) {
+        AuditLog.belongsTo(LoginHistory, {
+            foreignKey: 'login_history_id',
+            as: 'loginSession',
+        });
     }
 }
 
@@ -62,8 +79,8 @@ AuditLog.init(
         },
         action: { type: DataTypes.STRING, allowNull: false },
         method: { type: DataTypes.STRING, allowNull: false },
-        request_payload: { type: DataTypes.TEXT('long'), allowNull: false },
-        response_payload: { type: DataTypes.TEXT('long'), allowNull: false },
+        request_payload: { type: DataTypes.TEXT, allowNull: false },
+        response_payload: { type: DataTypes.TEXT, allowNull: false },
         response_length: { type: DataTypes.INTEGER, allowNull: true },
         status_code: { type: DataTypes.INTEGER, allowNull: false },
         ip_address: { type: DataTypes.STRING, allowNull: false },
@@ -71,6 +88,7 @@ AuditLog.init(
         user_id: { type: DataTypes.STRING, allowNull: true },
         user_role: { type: DataTypes.STRING, allowNull: false, defaultValue: 'unknown' },
         success: { type: DataTypes.BOOLEAN, allowNull: false },
+        login_history_id: { type: DataTypes.UUID, allowNull: true },
     },
     {
         sequelize,
