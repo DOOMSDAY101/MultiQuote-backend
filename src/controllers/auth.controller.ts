@@ -136,6 +136,7 @@ export const verifyLoginCode = async (req: Request, res: Response) => {
         const loginSession = await createLoginSession(req, user.id);
 
         req.loginHistoryId = loginSession.id; // Assign login history ID to the extended Request object
+
         const accessToken = signToken({
             id: user.id,
             role: user.role,
