@@ -18,7 +18,7 @@ export const sanitizeResponseBody = (obj: any): any => {
         JSON.stringify(obj, (key, value) => {
             if (!key) return value; // root object
             const lowerKey = key.toLowerCase();
-            if (lowerKey.includes("password") || lowerKey.includes("token")) {
+            if (lowerKey.includes("password") || lowerKey.includes("token") || lowerKey.includes("refreshToken")) {
                 return "[REDACTED]";
             }
             return value;

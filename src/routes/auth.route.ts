@@ -1,7 +1,7 @@
 // src/routes/user.routes.ts
 import { Router } from 'express';
-import { createUserValidator, handleValidation, isSuperAdminOrAdmin, loginValidator, verifyLoginCodeValidator } from '../middlewares/auth.middleware';
-import { createUser, loginUser, verifyLoginCode } from '../controllers/auth.controller';
+import { createUserValidator, handleValidation, isAuthenticated, isSuperAdminOrAdmin, loginValidator, verifyLoginCodeValidator } from '../middlewares/auth.middleware';
+import { createUser, loginUser, refreshToken, verifyLoginCode } from '../controllers/auth.controller';
 import { auditLogger } from '../middlewares/audit-logger.middleware';
 import { AuditActions } from '../enums/enums';
 const router = Router();
@@ -99,6 +99,7 @@ const router = Router();
 
 router.post(
     '/create-user',
+    isAuthenticated,
     isSuperAdminOrAdmin,
     handleValidation(createUserValidator),
     auditLogger(AuditActions.CREATE_USER),
@@ -264,5 +265,86 @@ router.post(
     auditLogger(AuditActions.VERIFY_EMAIL_TOKEN),
     verifyLoginCode
 );
+
+/**
+ * @swagger
+ * /api/v1/auth/refresh-token:
+ *   post:
+ *     summary: Refresh JWT token
+ *     description: Uses a valid refresh token to issue a new access token (and refresh token).
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Token refreshed successfully
+ *                 token:
+ *                   type: string
+ *                   example: "new-access-token-..."
+ *                 refreshToken:
+ *                   type: string
+ *                   example: "new-refresh-token-..."
+ *       400:
+ *         description: Refresh token required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Refresh token required
+ *       401:
+ *         description: Invalid or expired refresh token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid or expired refresh token
+ *       403:
+ *         description: User inactive or not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User inactive or no longer exists
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
+router.post("/refresh-token", refreshToken);
+
 
 export default router;

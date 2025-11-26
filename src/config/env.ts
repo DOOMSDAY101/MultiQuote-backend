@@ -28,6 +28,7 @@ export const config = {
 
     // JWT SECRET
     JWT_SECRET: process.env.JWT_SECRET as string,
+    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET as string,
     JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN as string,
     JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN as string,
     COOKIE_KEY: process.env.COOKIE_KEY as string,

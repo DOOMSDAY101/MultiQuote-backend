@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { body, ValidationChain, validationResult } from "express-validator";
 import { config } from "../config/env";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { UserRole } from "../models/user.model";
+import User, { BasicStatus, UserRole } from "../models/user.model";
 
 export const handleValidation = (rules: ValidationChain[]) => {
     return async (req: Request, res: Response, next: NextFunction) => {
@@ -27,22 +27,15 @@ export const isSuperAdmin = (
     res: Response,
     next: NextFunction
 ) => {
-    const token = req.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        return res.status(401).json({ message: 'Unauthorized' });
+    const user = req.user as JwtPayload & { role: UserRole };
+
+    if (user?.role !== UserRole.SUPER_ADMIN) {
+        return res.status(403).json({
+            message: 'Forbidden: Super Admins only',
+        });
     }
-    try {
-        const decoded = jwt.verify(token, config.JWT_SECRET) as JwtPayload & { role: UserRole };
-        if (!(decoded.role === UserRole.SUPER_ADMIN)) {
-            return res
-                .status(403)
-                .json({ message: 'Forbidden: Only Super Admins are allowed' });
-        }
-        req.user = decoded;
-        next();
-    } catch (error) {
-        return res.status(401).json({ message: 'Unauthorized' });
-    }
+
+    next();
 };
 
 export const isSuperAdminOrAdmin = (
@@ -50,29 +43,18 @@ export const isSuperAdminOrAdmin = (
     res: Response,
     next: NextFunction
 ) => {
-    const token = req.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        return res.status(401).json({ message: 'Unauthorized' });
+    const user = req.user as JwtPayload & { role: UserRole };
+
+    if (![UserRole.SUPER_ADMIN, UserRole.ADMIN].includes(user?.role)) {
+        return res.status(403).json({
+            message: 'Forbidden: Only Admins are allowed',
+        });
     }
-    try {
-        const decoded = jwt.verify(token, config.JWT_SECRET) as JwtPayload & { role: UserRole };
-        if (
-            !(
-                decoded.role === UserRole.SUPER_ADMIN || decoded.role === UserRole.ADMIN
-            )
-        ) {
-            return res
-                .status(403)
-                .json({ message: 'Forbidden: Only Admins are allowed' });
-        }
-        req.user = decoded;
-        next();
-    } catch (error) {
-        return res.status(401).json({ message: 'Unauthorized' });
-    }
+
+    next();
 };
 
-export const isAuthenticated = (
+export const isAuthenticated = async (
     req: Request,
     res: Response,
     next: NextFunction
@@ -83,6 +65,25 @@ export const isAuthenticated = (
     }
     try {
         const decoded = jwt.verify(token, config.JWT_SECRET) as JwtPayload & { role: UserRole };
+
+        // Find the user in DB
+        const user = await User.findByPk(decoded.id);
+
+        if (!user) {
+            return res.status(401).json({
+                status: 'Unauthorized',
+                message: 'Missing or invalid credentials',
+                statusCode: 401,
+            });
+        }
+
+        if (user.status !== BasicStatus.Active) {
+            return res.status(403).json({
+                status: 'Forbidden',
+                message: 'Your account is currently inactive',
+                statusCode: 403,
+            });
+        }
         req.user = decoded;
         next();
     } catch (error) {

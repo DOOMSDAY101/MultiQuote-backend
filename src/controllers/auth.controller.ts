@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
 import User, { BasicStatus, UserRole } from '../models/user.model';
-import { createLoginSession, formatPhoneNumber, generateRandomPassword, getIPDetails } from '../helpers/helper-function';
+import { createLoginSession, formatPhoneNumber, generateRandomPassword, getIPDetails, signRefreshToken, signToken } from '../helpers/helper-function';
 import { sendUserPasswordEmail, sendVerificationCodeEmail } from '../middlewares/email.middleware';
 import bcrypt from 'bcrypt';
 import { Op } from 'sequelize';
 import { VerificationToken } from '../models/verification-token.model';
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import { config } from '../config/env';
 
 
@@ -136,16 +136,22 @@ export const verifyLoginCode = async (req: Request, res: Response) => {
         const loginSession = await createLoginSession(req, user.id);
 
         req.loginHistoryId = loginSession.id; // Assign login history ID to the extended Request object
+        const accessToken = signToken({
+            id: user.id,
+            role: user.role,
+            login_history_id: loginSession.id,
+        });
 
-        const accessToken = jwt.sign(
-            { id: user.id, role: user.role, login_history_id: loginSession.id, },
-            config.JWT_SECRET!,
-            { expiresIn: "1h" }
-        );
+        const refreshToken = signRefreshToken({
+            id: user.id,
+            role: user.role,
+            login_history_id: loginSession.id,
+        });
 
         return res.status(200).json({
             message: "Login successful",
             token: accessToken,
+            refreshToken,
             user: {
                 id: user.id,
                 email: user.email,
@@ -157,6 +163,46 @@ export const verifyLoginCode = async (req: Request, res: Response) => {
 
     } catch (error) {
         console.error("Verification error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+
+export const refreshToken = async (req: Request, res: Response) => {
+    try {
+        const { refreshToken } = req.body;
+
+        if (!refreshToken) {
+            return res.status(400).json({ message: "Refresh token required" });
+        }
+
+        // Verify Refresh Token
+        let decoded: JwtPayload & { id: string; role: string; login_history_id: string };
+        try {
+            decoded = jwt.verify(refreshToken, config.JWT_REFRESH_SECRET!) as any;
+        } catch (err) {
+            return res.status(401).json({ message: "Invalid or expired refresh token" });
+        }
+
+        const user = await User.findByPk(decoded.id);
+        if (!user || user.status !== BasicStatus.Active) {
+            return res.status(403).json({ message: "User inactive or no longer exists" });
+        }
+
+        // Generate new access token
+        const newAccessToken = signToken({
+            id: user.id,
+            role: user.role,
+            login_history_id: decoded.login_history_id,
+        });
+
+        return res.status(200).json({
+            message: "Token refreshed successfully",
+            token: newAccessToken,
+        });
+
+    } catch (error) {
+        console.error("Refresh token error:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 };

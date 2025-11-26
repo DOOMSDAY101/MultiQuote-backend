@@ -69,8 +69,8 @@ export const signToken = (payload: any): string => {
 };
 
 export const signRefreshToken = (payload: any): string => {
-    const secret = config.JWT_SECRET;
-    const expiresIn = '15d';
+    const secret = config.JWT_REFRESH_SECRET;
+    const expiresIn = '7d';
 
     if (!secret || !expiresIn) {
         throw new Error('JWT secret or expiration time not provided');

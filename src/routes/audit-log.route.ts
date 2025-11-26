@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { handleValidation, isSuperAdminOrAdmin } from '../middlewares/auth.middleware';
+import { handleValidation, isAuthenticated, isSuperAdminOrAdmin } from '../middlewares/auth.middleware';
 import { auditLogQueryValidator } from '../middlewares/audit-logger.middleware';
 import { getAuditLogs } from '../controllers/audit-log.controller';
 
@@ -244,6 +244,7 @@ const router = Router();
 
 router.get(
     "/",
+    isAuthenticated,
     isSuperAdminOrAdmin,
     handleValidation(auditLogQueryValidator),
     getAuditLogs
