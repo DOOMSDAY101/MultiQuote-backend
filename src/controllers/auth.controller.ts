@@ -168,6 +168,58 @@ export const verifyLoginCode = async (req: Request, res: Response) => {
     }
 };
 
+export const resendLoginCode = async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body;
+
+        // 1. Check if user exists
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            return res.status(400).json({ message: "Invalid email" });
+        }
+
+        // 2. Ensure account is active
+        if (user.status !== BasicStatus.Active) {
+            return res.status(403).json({ message: "Account is inactive" });
+        }
+
+        // 3. Check for existing valid token
+        let tokenRecord = await VerificationToken.findOne({
+            where: {
+                userId: user.id,
+                expiresAt: { [Op.gt]: new Date() },
+            },
+        });
+
+        // 4. If no valid token → generate new one
+        if (!tokenRecord) {
+            const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+            const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // valid for 10 min
+
+            tokenRecord = await VerificationToken.create({
+                userId: user.id,
+                token: code,
+                expiresAt,
+            });
+        }
+
+        // 5. Send the verification email
+        await sendVerificationCodeEmail(
+            user.email,
+            `${user.firstName} ${user.lastName}`,
+            tokenRecord.token
+        );
+
+        return res.status(200).json({
+            message: "Verification code resent",
+            step: "verification_required",
+        });
+
+    } catch (error) {
+        console.error("Resend login code error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
 
 export const refreshToken = async (req: Request, res: Response) => {
     try {

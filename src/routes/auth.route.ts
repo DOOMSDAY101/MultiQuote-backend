@@ -1,7 +1,7 @@
 // src/routes/user.routes.ts
 import { Router } from 'express';
 import { createUserValidator, handleValidation, isAuthenticated, isSuperAdminOrAdmin, loginValidator, verifyLoginCodeValidator } from '../middlewares/auth.middleware';
-import { createUser, loginUser, refreshToken, verifyLoginCode } from '../controllers/auth.controller';
+import { createUser, loginUser, refreshToken, resendLoginCode, verifyLoginCode } from '../controllers/auth.controller';
 import { auditLogger } from '../middlewares/audit-logger.middleware';
 import { AuditActions } from '../enums/enums';
 const router = Router();
@@ -345,6 +345,86 @@ router.post(
  *                   example: Internal server error
  */
 router.post("/refresh-token", refreshToken);
+
+/**
+ * @swagger
+ * /api/v1/auth/resend-code:
+ *   post:
+ *     summary: Resend login verification code
+ *     description: Sends a new or existing valid verification code to the user's email to complete the login process.
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john.doe@example.com"
+ *     responses:
+ *       200:
+ *         description: Verification code resent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Verification code resent
+ *                 step:
+ *                   type: string
+ *                   example: verification_required
+ *       400:
+ *         description: Invalid email or user does not exist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid email
+ *       403:
+ *         description: User inactive or not allowed to continue login
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Account is inactive
+ *       429:
+ *         description: Too many code resend attempts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Too many attempts. Please wait before trying again.
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
+
+router.post('/resend-code', resendLoginCode);
+
 
 
 export default router;
