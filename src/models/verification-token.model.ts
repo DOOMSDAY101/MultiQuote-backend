@@ -7,6 +7,8 @@ interface VerificationTokenAttributes {
     userId: string;
     token: string;
     expiresAt: Date;
+    resendAttempts: number;
+    lastAttemptAt: Date;
 }
 
 interface VerificationTokenCreationAttributes
@@ -22,6 +24,8 @@ class VerificationToken
     declare userId: string;
     declare token: string;
     declare expiresAt: Date;
+    declare resendAttempts: number;
+    declare lastAttemptAt: Date;
 
     readonly createdAt!: Date;
     readonly updatedAt!: Date;
@@ -54,6 +58,15 @@ VerificationToken.init(
         expiresAt: {
             type: DataTypes.DATE,
             allowNull: false,
+        },
+        resendAttempts: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 1,
+        },
+        lastAttemptAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
         },
     },
     {
