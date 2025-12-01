@@ -242,44 +242,39 @@ export const resendLoginCode = async (req: Request, res: Response) => {
             },
         });
 
-        const now = new Date();
-
-        if (tokenRecord) {
-            // Check resend attempts within time window
-            if (
-                tokenRecord.lastAttemptAt &&
-                now.getTime() - tokenRecord.lastAttemptAt.getTime() < TIME_WINDOW_MS
-            ) {
-                if (tokenRecord.resendAttempts >= RESEND_LIMIT) {
-                    return res.status(429).json({
-                        message: `Too many attempts. Please wait ${Math.ceil(
-                            (TIME_WINDOW_MS -
-                                (now.getTime() - tokenRecord.lastAttemptAt.getTime())) /
-                            60000
-                        )} minutes.`,
-                    });
-                }
-
-                // Increase attempts
-                tokenRecord.resendAttempts += 1;
-            } else {
-                // Reset attempts due to time expiration
-                tokenRecord.resendAttempts = 1;
-            }
-
-            tokenRecord.lastAttemptAt = now;
-            await tokenRecord.save();
-        } else {
-            // No existing code → create new
-            const code = Math.floor(100000 + Math.random() * 900000).toString();
-            tokenRecord = await VerificationToken.create({
-                userId: user.id,
-                token: code,
-                expiresAt: new Date(Date.now() + TIME_WINDOW_MS),
-                resendAttempts: 1,
-                lastAttemptAt: now,
+        if (!tokenRecord) {
+            // No existing code → cannot resend, ask user to log in
+            return res.status(400).json({
+                message: "Verification code expired. Please log in again to request a new one.",
             });
         }
+
+        const now = new Date();
+
+        // Check resend attempts within time window
+        if (
+            tokenRecord.lastAttemptAt &&
+            now.getTime() - tokenRecord.lastAttemptAt.getTime() < TIME_WINDOW_MS
+        ) {
+            if (tokenRecord.resendAttempts >= RESEND_LIMIT) {
+                return res.status(429).json({
+                    message: `Too many attempts. Please wait ${Math.ceil(
+                        (TIME_WINDOW_MS -
+                            (now.getTime() - tokenRecord.lastAttemptAt.getTime())) /
+                        60000
+                    )} minutes.`,
+                });
+            }
+
+            // Increase attempts
+            tokenRecord.resendAttempts += 1;
+        } else {
+            // Reset attempts due to time expiration
+            tokenRecord.resendAttempts = 1;
+        }
+
+        tokenRecord.lastAttemptAt = now;
+        await tokenRecord.save();
 
         // Send verification email
         await sendVerificationCodeEmail(
