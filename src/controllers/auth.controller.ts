@@ -333,3 +333,44 @@ export const refreshToken = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error" });
     }
 };
+
+
+
+export const verifyToken = async (req: Request, res: Response) => {
+    try {
+        // Get token from headers
+        const authHeader = req.headers['authorization'];
+        const token = authHeader?.split(' ')[1];
+
+        if (!token) return res.status(401).json({ message: 'No token provided' });
+
+        // Verify token
+        let decoded: any;
+        try {
+            decoded = jwt.verify(token, config.JWT_SECRET!);
+        } catch (err) {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+
+        // Check if user exists and is active
+        const user = await User.findByPk(decoded.id);
+        if (!user || user.status !== BasicStatus.Active) {
+            return res.status(403).json({ message: 'User inactive or does not exist' });
+        }
+
+        // Return user info if valid
+        return res.status(200).json({
+            message: 'Token valid',
+            user: {
+                id: user.id,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                role: user.role,
+            },
+        });
+    } catch (error) {
+        console.error('Verify token error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};

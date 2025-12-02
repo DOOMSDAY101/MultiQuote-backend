@@ -1,7 +1,7 @@
 // src/routes/user.routes.ts
 import { Router } from 'express';
 import { createUserValidator, handleValidation, isAuthenticated, isSuperAdminOrAdmin, loginValidator, verifyLoginCodeValidator } from '../middlewares/auth.middleware';
-import { createUser, loginUser, refreshToken, resendLoginCode, verifyLoginCode } from '../controllers/auth.controller';
+import { createUser, loginUser, refreshToken, resendLoginCode, verifyLoginCode, verifyToken } from '../controllers/auth.controller';
 import { auditLogger } from '../middlewares/audit-logger.middleware';
 import { AuditActions } from '../enums/enums';
 const router = Router();
@@ -425,6 +425,76 @@ router.post("/refresh-token", refreshToken);
 
 router.post('/resend-code', resendLoginCode);
 
+
+/**
+ * @swagger
+ * /api/v1/auth/me:
+ *   get:
+ *     summary: Verify current user's authentication token
+ *     description: Checks if the provided JWT access token is valid. Returns the authenticated user's information if the token is valid.
+ *     tags:
+ *       - Authentication
+ *     responses:
+ *       200:
+ *         description: Token is valid and user is authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Token valid
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       example: "c7b7f570-2e93-4e53-8b90-6d738c99a09c"
+ *                     firstName:
+ *                       type: string
+ *                       example: John
+ *                     lastName:
+ *                       type: string
+ *                       example: Doe
+ *                     email:
+ *                       type: string
+ *                       example: john.doe@mail.com
+ *                     role:
+ *                       type: string
+ *                       example: USER
+ *       401:
+ *         description: Unauthorized (No token provided or invalid/expired token)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid or expired token
+ *       403:
+ *         description: Forbidden (User inactive or no longer exists)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User inactive or does not exist
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
+router.get('/me', verifyToken);
 
 
 export default router;
