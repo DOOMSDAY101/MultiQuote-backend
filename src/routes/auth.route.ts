@@ -1,4 +1,3 @@
-// src/routes/user.routes.ts
 import { Router } from 'express';
 import { createUserValidator, handleValidation, isAuthenticated, isSuperAdminOrAdmin, loginValidator, verifyLoginCodeValidator } from '../middlewares/auth.middleware';
 import { createUser, loginUser, refreshToken, resendLoginCode, verifyLoginCode, verifyToken } from '../controllers/auth.controller';
