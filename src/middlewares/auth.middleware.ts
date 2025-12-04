@@ -119,12 +119,6 @@ export const createUserValidator: ValidationChain[] = [
         .matches(/^\+?\d+$/)
         .withMessage("Phone number must contain only digits and may start with '+'"),
 
-    body("signature")
-        .optional()
-        .trim()
-        .isURL()
-        .withMessage("Signature must be a valid URL"),
-
     body("role")
         .optional()
         .isIn(Object.values(UserRole))

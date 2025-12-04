@@ -7,11 +7,12 @@ import { Op } from 'sequelize';
 import { VerificationToken } from '../models/verification-token.model';
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { config } from '../config/env';
+import { uploadToCloudinary } from '../config/cloudinary';
 
 
 export const createUser = async (req: Request, res: Response) => {
     try {
-        const { firstName, lastName, email, phoneNumber, signature, role = UserRole.USER } = req.body;
+        const { firstName, lastName, email, phoneNumber, role = UserRole.USER } = req.body;
 
         // Check for existing user
         const existingUser = await User.findOne({ where: { email } });
@@ -28,6 +29,12 @@ export const createUser = async (req: Request, res: Response) => {
             }
         }
 
+        let imgUrl: string | undefined;
+        let signatureUrl: string | undefined;
+        const files = req.files as { [key: string]: Express.Multer.File[] } | undefined;
+
+        if (files?.img?.[0]) imgUrl = await uploadToCloudinary(files.img[0].buffer, '/Multiquote/users');
+        if (files?.signature?.[0]) signatureUrl = await uploadToCloudinary(files.signature[0].buffer, '/Multiquote/signatures');
 
         // Generate password
         const plainPassword = generateRandomPassword();
@@ -37,7 +44,8 @@ export const createUser = async (req: Request, res: Response) => {
             lastName,
             email,
             phoneNumber: formattedPhone,
-            signature,
+            img: imgUrl,
+            signature: signatureUrl,
             password: plainPassword,
             role,
             status: BasicStatus.Active,

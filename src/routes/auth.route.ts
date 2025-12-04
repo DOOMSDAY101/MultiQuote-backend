@@ -3,6 +3,7 @@ import { createUserValidator, handleValidation, isAuthenticated, isSuperAdminOrA
 import { createUser, loginUser, refreshToken, resendLoginCode, verifyLoginCode, verifyToken } from '../controllers/auth.controller';
 import { auditLogger } from '../middlewares/audit-logger.middleware';
 import { AuditActions } from '../enums/enums';
+import { multerErrorHandler, upload } from '../middlewares/upload.middleware';
 const router = Router();
 
 /**
@@ -16,7 +17,7 @@ const router = Router();
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
@@ -27,20 +28,33 @@ const router = Router();
  *               firstName:
  *                 type: string
  *                 example: John
+ *                 description: User's first name
  *               lastName:
  *                 type: string
  *                 example: Doe
+ *                 description: User's last name
  *               email:
  *                 type: string
  *                 format: email
  *                 example: john.doe@mail.com
+ *                 description: User's email (must be unique)
  *               phoneNumber:
  *                 type: string
  *                 example: "+2348012345678"
+ *                 description: Optional phone number
+ *               role:
+ *                 type: string
+ *                 enum: [SUPER_ADMIN, ADMIN, USER]
+ *                 example: USER
+ *                 description: User role
+ *               img:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional profile image (jpg/png, max 5 MB)
  *               signature:
  *                 type: string
- *                 format: url
- *                 example: "https://example.com/user-signature.png"
+ *                 format: binary
+ *                 description: Optional signature image (jpg/png, max 5 MB)
  *     responses:
  *       201:
  *         description: User account created successfully and password emailed
@@ -71,7 +85,7 @@ const router = Router();
  *                       type: string
  *                       example: USER
  *       400:
- *         description: Bad request (Email already in use or validation failed)
+ *         description: Bad request (validation failed or Multer error)
  *         content:
  *           application/json:
  *             schema:
@@ -79,7 +93,7 @@ const router = Router();
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Email already in use
+ *                   example: File too large. Max 5 MB allowed.
  *       401:
  *         description: Unauthorized (User not logged in)
  *       403:
@@ -100,9 +114,14 @@ router.post(
     '/create-user',
     isAuthenticated,
     isSuperAdminOrAdmin,
+    upload.fields([
+        { name: 'img', maxCount: 1 },
+        { name: 'signature', maxCount: 1 },
+    ]),                        // Multer middleware
+    multerErrorHandler,         // Handle Multer errors ONLY
     handleValidation(createUserValidator),
     auditLogger(AuditActions.CREATE_USER),
-    createUser
+    createUser                  // Your main controller
 );
 
 /**
