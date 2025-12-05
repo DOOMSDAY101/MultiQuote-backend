@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { createUserValidator, handleValidation, isAuthenticated, isSuperAdminOrAdmin, loginValidator, verifyLoginCodeValidator } from '../middlewares/auth.middleware';
-import { createUser, loginUser, refreshToken, resendLoginCode, verifyLoginCode, verifyToken } from '../controllers/auth.controller';
+import { createUserValidator, editUserValidator, handleValidation, isAuthenticated, isSuperAdminOrAdmin, loginValidator, toggleUserStatusValidator, verifyLoginCodeValidator } from '../middlewares/auth.middleware';
+import { createUser, editUser, loginUser, refreshToken, resendLoginCode, toggleUserStatus, verifyLoginCode, verifyToken } from '../controllers/auth.controller';
 import { auditLogger } from '../middlewares/audit-logger.middleware';
 import { AuditActions } from '../enums/enums';
 import { multerErrorHandler, upload } from '../middlewares/upload.middleware';
@@ -123,6 +123,241 @@ router.post(
     auditLogger(AuditActions.CREATE_USER),
     createUser                  // Your main controller
 );
+
+/**
+ * @swagger
+ * /api/v1/auth/edit-user/{id}:
+ *   patch:
+ *     summary: Edit an existing user (Admin only)
+ *     description: Allows an Admin or Super Admin to edit user details. SUPER_ADMIN details cannot be edited except by another SUPER_ADMIN when updating password. All fields are optional. Password updates will send an email with the new password.
+ *     tags:
+ *       - Admin Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: UUID of the user to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 description: User's first name
+ *                 example: Jane
+ *               lastName:
+ *                 type: string
+ *                 description: User's last name
+ *                 example: Doe
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email
+ *                 example: jane.doe@mail.com
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Phone number (digits only, may start with '+')
+ *                 example: "+2348012345678"
+ *               role:
+ *                 type: string
+ *                 enum: [SUPER_ADMIN, ADMIN, USER]
+ *                 description: User role (cannot edit SUPER_ADMIN role)
+ *                 example: USER
+ *               password:
+ *                 type: string
+ *                 description: Optional new password (will trigger email)
+ *                 example: MyNewPass123
+ *               img:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional new profile image (jpg/png, max 5 MB)
+ *               signature:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional new signature image (jpg/png, max 5 MB)
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User updated successfully
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       example: "c7b7f570-2e93-4e53-8b90-6d738c99a09c"
+ *                     firstName:
+ *                       type: string
+ *                       example: Jane
+ *                     lastName:
+ *                       type: string
+ *                       example: Doe
+ *                     email:
+ *                       type: string
+ *                       example: jane.doe@mail.com
+ *                     role:
+ *                       type: string
+ *                       example: USER
+ *                     status:
+ *                       type: string
+ *                       example: Active
+ *       400:
+ *         description: Bad request (validation failed or Multer error)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Invalid phone number
+ *       401:
+ *         description: Unauthorized (User not logged in)
+ *       403:
+ *         description: Forbidden (Cannot edit SUPER_ADMIN details)
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
+
+router.patch(
+    '/edit-user/:id',
+    isAuthenticated,
+    isSuperAdminOrAdmin,
+    upload.fields([
+        { name: 'img', maxCount: 1 },
+        { name: 'signature', maxCount: 1 },
+    ]),                     // Multer middleware
+    multerErrorHandler,      // Handle Multer errors ONLY
+    handleValidation(editUserValidator),
+    auditLogger(AuditActions.EDIT_USER),
+    editUser
+);
+
+/**
+ * @swagger
+ * /api/v1/auth/user/{id}/toggle-status:
+ *   patch:
+ *     summary: Toggle a user's activation status (Admin only)
+ *     description: Toggles a user's status between Active and Inactive. SUPER_ADMIN users cannot be toggled.
+ *     tags:
+ *       - Admin Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The unique ID of the user whose status is being toggled
+ *     responses:
+ *       200:
+ *         description: User status successfully toggled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User is now Inactive
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       example: "c7b7f570-2e93-4e53-8b90-6d738c99a09c"
+ *                     firstName:
+ *                       type: string
+ *                       example: John
+ *                     lastName:
+ *                       type: string
+ *                       example: Doe
+ *                     email:
+ *                       type: string
+ *                       example: john.doe@mail.com
+ *                     status:
+ *                       type: string
+ *                       enum: [Active, Inactive]
+ *                       example: Inactive
+ *       400:
+ *         description: Bad request (validation failed)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errors:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       message:
+ *                         type: string
+ *                         example: Invalid user ID
+ *       401:
+ *         description: Unauthorized (User not logged in)
+ *       403:
+ *         description: Forbidden (User not admin, super-admin, or trying to toggle SUPER_ADMIN)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Cannot change status of a SUPER_ADMIN user
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Something went wrong
+ */
+
+router.patch(
+    '/user/:id/toggle-status',
+    isAuthenticated,
+    isSuperAdminOrAdmin,
+    handleValidation(toggleUserStatusValidator),
+    auditLogger(AuditActions.TOGGLE_USER_STATUS),
+    toggleUserStatus
+);
+
 
 /**
  * @swagger

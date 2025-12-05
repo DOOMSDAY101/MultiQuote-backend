@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { body, ValidationChain, validationResult } from "express-validator";
+import { body, param, ValidationChain, validationResult } from "express-validator";
 import { config } from "../config/env";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import User, { BasicStatus, UserRole } from "../models/user.model";
@@ -12,9 +12,13 @@ export const handleValidation = (rules: ValidationChain[]) => {
         }
 
         // Check for validation result
+
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            const errorArray = errors.array().map((error) => error.msg);
+            // Map to array of objects with 'message'
+            const errorArray = errors.array().map((error) => ({
+                message: error.msg
+            }));
             return res.status(400).json({ errors: errorArray });
         }
 
@@ -114,7 +118,7 @@ export const createUserValidator: ValidationChain[] = [
         .withMessage("Invalid email format"),
 
     body("phoneNumber")
-        .optional()
+        .notEmpty()
         .trim()
         .matches(/^\+?\d+$/)
         .withMessage("Phone number must contain only digits and may start with '+'"),
@@ -123,6 +127,63 @@ export const createUserValidator: ValidationChain[] = [
         .optional()
         .isIn(Object.values(UserRole))
         .withMessage(`Role must be one of: ${Object.values(UserRole).join(", ")}`),
+];
+
+export const editUserValidator = [
+    body('firstName')
+        .optional()
+        .trim()
+        .notEmpty()
+        .withMessage('First name cannot be empty')
+        .isString()
+        .withMessage('First name must be a string'),
+
+    body('lastName')
+        .optional()
+        .trim()
+        .notEmpty()
+        .withMessage('Last name cannot be empty')
+        .isString()
+        .withMessage('Last name must be a string'),
+
+    body('email')
+        .optional()
+        .trim()
+        .notEmpty()
+        .withMessage('Email cannot be empty')
+        .isEmail()
+        .withMessage('Invalid email format'),
+
+    body('phoneNumber')
+        .optional()
+        .trim()
+        .notEmpty()
+        .withMessage('Phone number cannot be empty')
+        .matches(/^\+?\d+$/)
+        .withMessage("Phone number must contain only digits and may start with '+'"),
+
+    body('role')
+        .optional()
+        .isIn(Object.values(UserRole))
+        .withMessage(`Role must be one of: ${Object.values(UserRole).join(', ')}`),
+
+    body('password')
+        .optional()
+        .isString()
+        .withMessage('Password must be a string')
+        .isLength({ min: 6 })
+        .withMessage('Password must be at least 6 characters long'),
+];
+
+
+export const toggleUserStatusValidator = [
+    // Validate the 'id' route param
+    param('id')
+        .trim()
+        .notEmpty()
+        .withMessage('User ID is required')
+        .isUUID()
+        .withMessage('Invalid user ID'),
 ];
 
 export const loginValidator = [

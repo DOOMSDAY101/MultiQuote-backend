@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import User, { BasicStatus, UserRole } from '../models/user.model';
-import { createLoginSession, formatPhoneNumber, generateRandomPassword, getIPDetails, signRefreshToken, signToken } from '../helpers/helper-function';
+import { createLoginSession, formatPhoneNumber, generateRandomPassword, getIPDetails, hashPassword, signRefreshToken, signToken } from '../helpers/helper-function';
 import { sendUserPasswordEmail, sendVerificationCodeEmail } from '../middlewares/email.middleware';
 import bcrypt from 'bcrypt';
 import { Op } from 'sequelize';
@@ -52,7 +52,7 @@ export const createUser = async (req: Request, res: Response) => {
         });
 
         // Send email
-        await sendUserPasswordEmail(email, firstName, plainPassword);
+        await sendUserPasswordEmail(email, firstName, plainPassword, 'create');
 
         return res.status(201).json({
             message: 'User account created successfully',
@@ -71,6 +71,110 @@ export const createUser = async (req: Request, res: Response) => {
     }
 };
 
+
+export const editUser = async (req: Request, res: Response) => {
+    try {
+        const userId = req.params.id;
+        const { firstName, lastName, email, phoneNumber, role, password } = req.body;
+
+        // Find the user to update
+        const user = await User.findByPk(userId);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // Prevent editing SUPER_ADMIN unless just changing password as SUPER_ADMIN
+        if (user.role === UserRole.SUPER_ADMIN && !(req.user?.role === UserRole.SUPER_ADMIN && password)) {
+            return res.status(403).json({ message: 'Cannot edit SUPER_ADMIN details' });
+        }
+
+        // Check email uniqueness if updating
+        if (email && email !== user.email) {
+            const existingUser = await User.findOne({ where: { email } });
+            if (existingUser) return res.status(400).json({ message: 'Email already in use' });
+            user.email = email;
+        }
+
+        // Format phone number
+        if (phoneNumber) {
+            try {
+                user.phoneNumber = formatPhoneNumber(phoneNumber);
+            } catch (err) {
+                return res.status(400).json({ message: (err as Error).message });
+            }
+        }
+
+        // Update other fields if provided (except SUPER_ADMIN restrictions)
+        if (firstName) user.firstName = firstName;
+        if (lastName) user.lastName = lastName;
+        if (role && user.role !== UserRole.SUPER_ADMIN) user.role = role;
+
+        // Handle file uploads
+        const files = req.files as { [key: string]: Express.Multer.File[] } | undefined;
+        if (files?.img?.[0]) user.img = await uploadToCloudinary(files.img[0].buffer, '/Multiquote/users');
+        if (files?.signature?.[0]) user.signature = await uploadToCloudinary(files.signature[0].buffer, '/Multiquote/signatures');
+
+        // Update password if provided
+        if (password) {
+            user.password = hashPassword(password);
+            // Send new password via email
+            await sendUserPasswordEmail(user.email, user.firstName, password, 'update');
+        }
+
+        await user.save();
+
+        return res.status(200).json({
+            message: 'User updated successfully',
+            user: {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                role: user.role,
+                status: user.status,
+            },
+        });
+    } catch (error) {
+        console.error('Edit user error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+export const toggleUserStatus = async (req: Request, res: Response) => {
+    try {
+        const userId = req.params.id;
+
+        // Find the user by primary key
+        const user = await User.findByPk(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Prevent toggling SUPER_ADMIN users
+        if (user.role === UserRole.SUPER_ADMIN) {
+            return res.status(403).json({ message: 'Cannot change status of a SUPER_ADMIN user' });
+        }
+
+        // Toggle status
+        user.status = user.status === BasicStatus.Active ? BasicStatus.Inactive : BasicStatus.Active;
+
+        // Save changes
+        await user.save();
+
+        // Respond with updated user info
+        return res.status(200).json({
+            message: `User is now ${user.status}`,
+            user: {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                status: user.status,
+            },
+        });
+    } catch (error) {
+        console.error('Error toggling user status:', error);
+        return res.status(500).json({ message: 'Something went wrong' });
+    }
+};
 
 export const loginUser = async (req: Request, res: Response) => {
     try {
